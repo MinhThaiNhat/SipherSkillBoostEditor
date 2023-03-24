@@ -26,11 +26,15 @@ public class SipherSkillBoostEditor : ModuleRules
 			new string[]
 			{
 				"Core",
+                "Kismet",
                 "UnrealEd",
-				"AssetTools",
+                "AssetTools",
                 "GlobalEventSystem",
 				"DataTableEditor",
+				"EditorStyle",
                 "InputCore",
+                "AssetTools",
+                "EditorScriptingUtilities",
                 "SipherGameModuleRuntime"
 				// ... add other public dependencies that you statically link with here ...
 			}
