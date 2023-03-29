@@ -35,6 +35,7 @@ public:
 	void LoadGraphAsset();
 	TSharedRef<SGraphEditor> CreateGraphEditorWidget(UEdGraph* InGraph);
 	TSharedRef<SWidget> CreateOptionalDataOnlyMessage() const;
+	void PostRegenerateMenusAndToolbars() override;
 
 private:
 	void OnFinishChangeSkillData(const FPropertyChangedEvent& Event);
@@ -59,6 +60,4 @@ private:
 	TSharedPtr<class FDocumentTracker> DocumentManager;
 	TSharedPtr<class FDocumentTabFactory> GraphEditorFactory;
 
-private:
-	void CreateAbilityNode(UEdGraph* ParentGraph, const FVector2D NodeLocation);
 };

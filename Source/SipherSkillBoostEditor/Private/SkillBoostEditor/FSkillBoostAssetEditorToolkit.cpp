@@ -25,6 +25,8 @@
 #include "SkillBoostEditor/SipherEdGraph.h"
 #include "Widgets/Layout/SWrapBox.h"
 #include "Widgets/Text/SMultiLineEditableText.h"
+#include "SourceCodeNavigation.h"
+#include "Widgets/Input/SHyperlink.h"
 
 #define LOCTEXT_NAMESPACE "FSkillEditor"
 static const FName GraphEditorID = TEXT("Document");
@@ -80,7 +82,7 @@ void FGraphEditorSummoner::SaveState(TSharedPtr<SDockTab> Tab, TSharedPtr<FTabPa
 	auto GraphAsset = StaticCastSharedPtr<FSkillBoostAssetEditorToolkit>(HostingApp.Pin())->GetGraphAsset();
 	if (Graph && GraphAsset)
 	{
-		GraphAsset->LastEditedDocuments.Add(FEditedDocumentInfo(Graph, ViewLocation, ZoomAmount));
+		GraphAsset->LastEditedDocuments.Add(FSipherEditedDocumentInfo(FName(Graph->GetName()), ViewLocation, ZoomAmount));
 	}
 }
 
@@ -109,36 +111,6 @@ FSkillBoostAssetEditorToolkit::FSkillBoostAssetEditorToolkit()
 
 FSkillBoostAssetEditorToolkit::~FSkillBoostAssetEditorToolkit()
 {
-}
-
-void FSkillBoostAssetEditorToolkit::CreateAbilityNode(UEdGraph* ParentGraph, const FVector2D NodeLocation)
-{
-	check(ParentGraph != nullptr);
-	float SpanDegree = 360.0f / (Asset->SkillAbility.SkillAbilityClasses.Num() - 1);
-	float Distance = 200;
-	float Angle = 0;
-	for (auto& Ability : Asset->SkillAbility.SkillAbilityClasses)
-	{
-		USipherAbilityEdGraphNode* ResultGraphNode = NewObject<USipherAbilityEdGraphNode>(ParentGraph, Ability.Key);
-		ParentGraph->Modify();
-		ResultGraphNode->SetFlags(RF_Transactional);
-		ResultGraphNode->SetAbility(Ability.Key, Ability.Value);
-		ResultGraphNode->CreateNewGuid();
-		if (Ability.Key != "Base")
-		{
-			ResultGraphNode->NodePosX = FMath::Cos(Angle) * Distance + NodeLocation.X;
-			ResultGraphNode->NodePosY = FMath::Sin(Angle) * Distance + NodeLocation.Y;
-		}
-		else
-		{
-			ResultGraphNode->NodePosX = NodeLocation.X;
-			ResultGraphNode->NodePosY = NodeLocation.Y;
-		}
-
-		ResultGraphNode->AllocateDefaultPins();
-		ParentGraph->AddNode(ResultGraphNode);
-		Angle += SpanDegree;
-	}
 }
 
 void FSkillBoostAssetEditorToolkit::RegisterTabSpawners(const TSharedRef<FTabManager>& InTabManager)
@@ -222,17 +194,16 @@ void FSkillBoostAssetEditorToolkit::OnSelectedNodesChanged(const FName& BoostId,
 	{
 		Selection.Add(SelectionEntry);
 	}
-	if (Selection.Num() == 0) 
-	{
-		TabManager->TryInvokeTab(FName("AssetPropertyTab"));
-	}
-	else if (InGrapSelected.Num() == 1)
+	if (InGrapSelected.Num() == 1)
 	{
 		auto V = Cast<USipherAbilityEdGraphNode>(Selection[0]);
 		if (!SkillBoostView)
 			TabManager->TryInvokeTab(FName("SkillBoostInfoTab"));
 		if (SkillBoostView)
-			SkillBoostView->SetStructureData(V->Settings);
+		{
+			auto Settings = MakeShareable(new FStructOnScope(FSkillBoostInfoEditor::StaticStruct(), (uint8*)&V->GetBoostEditorInfo()));
+			SkillBoostView->SetStructureData(Settings);
+		}
 		TabManager->TryInvokeTab(FName("SkillBoostInfoTab"));
 	}
 }
@@ -424,22 +395,20 @@ void FSkillBoostAssetEditorToolkit::OnClose()
 
 void FSkillBoostAssetEditorToolkit::RestoreTab()
 {
-	if (!Asset)
+	if (!GraphAsset)
 		return;
-	/*for (auto& Doc : Asset->LastEditedDocuments)
+	for (auto& Doc : GraphAsset->LastEditedDocuments)
 	{
-		if (UObject* Obj = Doc.EditedObjectPath.ResolveObject())
+		if (!GraphAsset->EdGraphs.Contains(Doc.DocumentName))
+			continue;
+		if (USipherEdGraph* Obj = GraphAsset->EdGraphs[Doc.DocumentName])
 		{
-			if(UEdGraph* Graph = Cast<USipherEdGraph>(Obj))
-			{
-				TSharedRef<FTabPayload_UObject> Payload = FTabPayload_UObject::Make(Graph);
+				TSharedRef<FTabPayload_UObject> Payload = FTabPayload_UObject::Make(Obj);
 				TSharedPtr<SDockTab> DocumentTab = DocumentManager->OpenDocument(Payload, FDocumentTracker::OpenNewDocument);
-
 				TSharedRef<SGraphEditor> GraphEditor = StaticCastSharedRef<SGraphEditor>(DocumentTab->GetContent());
 				GraphEditor->SetViewLocation(Doc.SavedViewOffset, Doc.SavedZoomAmount);
-			}
 		}
-	}*/
+	}
 }
 
 
@@ -465,4 +434,10 @@ void FSkillBoostAssetEditorToolkit::OnFinishChangeSkillData(const FPropertyChang
 {
 	UClass* Class = USipherSkillData::StaticClass();
 	//Class->FindPropertyByName()
+}
+
+
+void FSkillBoostAssetEditorToolkit::PostRegenerateMenusAndToolbars()
+{
+	
 }

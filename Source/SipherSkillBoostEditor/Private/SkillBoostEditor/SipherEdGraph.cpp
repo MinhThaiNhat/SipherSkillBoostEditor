@@ -72,6 +72,11 @@ void USipherEdGraph::SyncData(USipherSkillData* SkillData, FSipherSkillBoostData
 
 	for (const auto& AbilityBoost : BoostData->AbilityAndConditionToActivate)
 	{
+		if (!AbilityToNode.Contains(AbilityBoost.Key))
+		{
+			//TODO: Make a warning that ability name in skill boost not exist in skill data
+			continue;
+		}
 		auto ToNode = AbilityToNode[AbilityBoost.Key];
 		auto  ExecPin = ToNode->FindPin(ESkillPhase::ESP_None);
 		for (const auto& FromAbility : AbilityBoost.Value.AbilityPhaseDependOn)
@@ -84,13 +89,8 @@ void USipherEdGraph::SyncData(USipherSkillData* SkillData, FSipherSkillBoostData
 		}
 	}
 
-	//for (const auto& AbilityNode : AbilityToNode)
-	//{
-	//	if (!BoostData->AbilityAndConditionToActivate.Contains(AbilityNode.Key))
-	//	{
-	//		auto Color = AbilityNode.Value->GetNodeTitleColor();
-	//		Color.A = 125;
-	//		AbilityNode.Value->SetNote;
-	//	}
-	//}
+	for (const auto& AbilityNode : AbilityToNode)
+	{
+		AbilityNode.Value->Sync();
+	}
 }

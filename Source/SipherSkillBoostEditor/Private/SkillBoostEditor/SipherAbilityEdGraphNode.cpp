@@ -9,16 +9,48 @@ void USipherAbilityEdGraphNode::SetAbility(const FName& InAbilityAtlasName, cons
 {
 	AbilityAtlasName = InAbilityAtlasName;
 	Info = InInfo;
-	Settings = MakeShareable(new FStructOnScope(FSipherSubSkillInfo::StaticStruct(), (uint8*)&Info));
-
-	//Settings = MakeShared<TStructOnScope<FSipherSubSkillInfo>>(reinterpret_cast<uint8*>(&Info));
 }
 
 void USipherAbilityEdGraphNode::SetBoost(FSipherSkillBoostData* BoostData)
 {
 	if (BoostData)
+	{
 		BoostInfo = *BoostData;
+		if (AbilityAtlasName == "Base")
+		{
+			EditorInfo.Ability = AbilityAtlasName;
+			EditorInfo.SkillParamModifierInfo = BoostData->SkillParamModifierInfo;
+			EditorInfo.TargetingType = BoostData->TargetingType;
+			Settings = MakeShareable(new FStructOnScope(FSkillBoostInfoEditor::StaticStruct(), (uint8*)&EditorInfo));
+		}
+		else if (BoostData->AbilityAndConditionToActivate.Contains(AbilityAtlasName))
+		{
+			EditorInfo.Ability = AbilityAtlasName;
+			EditorInfo.SkillParamModifierInfo = BoostData->AbilityAndConditionToActivate[AbilityAtlasName].SkillParamModifierInfo;
+			EditorInfo.TargetingType = BoostData->AbilityAndConditionToActivate[AbilityAtlasName].TargetingType;
+			Settings = MakeShareable(new FStructOnScope(FSkillBoostInfoEditor::StaticStruct(), (uint8*)&EditorInfo));
+		}
+		Settings = MakeShareable(new FStructOnScope(FSipherSkillBoostData::StaticStruct(), (uint8*)&BoostInfo));
+	}
 }
+
+void USipherAbilityEdGraphNode::Sync()
+{
+	bool bHasAnyConnection = false;
+	for (auto Pin : Pins)
+	{
+		if (Pin->HasAnyConnections())
+		{
+			bHasAnyConnection = true;
+			break;
+		}
+	}
+	bool bHasBoostInfo = BoostInfo.AbilityAndConditionToActivate.Contains(GetAbilityName());
+
+	if (!bHasBoostInfo && !bHasAnyConnection)
+		MakeAutomaticallyPlacedGhostNode();
+}
+
 template<class EnumType>
 static FORCEINLINE EnumType GetEnumValueFromString(const FString& EnumName, const FName& String)
 {
@@ -40,6 +72,7 @@ UEdGraphPin* USipherAbilityEdGraphNode::FindPin(ESkillPhase Phase)
 		auto OutPhase = GetEnumValueFromString<ESkillPhase>("ESkillPhase", Pin->PinType.PinSubCategory);
 		if (OutPhase == Phase)
 		{
+			SkillPhaseToPin.Add(OutPhase, Pin);
 			return Pin;
 		}
 	}
@@ -84,50 +117,20 @@ FLinearColor USipherAbilityEdGraphNode::GetNodeTitleColor() const
 
 	if (AbilityAtlasName == "Base")
 	{
-		auto Color = FLinearColor::Red;
-		if (BoostInfo.SkillParamModifierInfo.IsEmpty() && !IsValid(*BoostInfo.TargetingType))
-		{
-			Color.A = 0.2;
-		}
-		return Color;
+		return FLinearColor::Red;
 	}
 	else
 	{
-		auto Color = FLinearColor::Yellow;
-		if (!BoostInfo.AbilityAndConditionToActivate.Contains(GetAbilityName()))
-		{
-			Color.A = 0.2;
-		}
-		return Color;
+		return FLinearColor::Yellow;
 	}
 }
 
 FLinearColor USipherAbilityEdGraphNode::GetNodeBodyTintColor() const
 {
-	for (auto Pin : Pins)
-	{
-		if (Pin->HasAnyConnections())
-			return FLinearColor::White;
-	}
-	auto Color = FLinearColor::White;
-	if (AbilityAtlasName == "Base")
-	{
-		if (BoostInfo.SkillParamModifierInfo.IsEmpty() && !IsValid(*BoostInfo.TargetingType))
-		{
-			Color.A = 0.2;
-		}
-	}
-	else
-	{
-		if (!BoostInfo.AbilityAndConditionToActivate.Contains(GetAbilityName()))
-		{
-			Color.A = 0.2;
-		}
-	}
-	return Color;
+	return Super::GetNodeBodyTintColor();
 }
 
 FText USipherAbilityEdGraphNode::GetTooltipText() const
 {
-	return NSLOCTEXT("EditorExtenstion", "Our Graph Node Tooltip", "Our Graph Node Tooltip");
+	return FText::FromString(BoostInfo.Description);
 }

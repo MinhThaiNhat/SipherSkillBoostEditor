@@ -8,6 +8,19 @@
 #include "Skill/SipherSkillBoostData.h"
 #include "SipherAbilityEdGraphNode.generated.h"
 
+
+USTRUCT(BlueprintType)
+struct FSkillBoostInfoEditor
+{
+	GENERATED_BODY()
+	UPROPERTY()
+	FName Ability;
+	UPROPERTY()
+	TSubclassOf<class USipherAbilityTargetType> TargetingType;
+	UPROPERTY()
+	TArray<FSipherSkillParamModifierInfo> SkillParamModifierInfo;
+};
+
 /**
  * 
  */
@@ -20,6 +33,8 @@ public:
 	inline static FName PinSubCategory {"PinAbilityEventSubCategory"};
 	void SetAbility(const FName& AbilityAtlasName, const struct FSipherSubSkillInfo& Info);
 	void SetBoost(struct FSipherSkillBoostData* BoostData);
+	void Sync();
+
 	/** Begin UEdGraphNode Interface */
 	virtual void AllocateDefaultPins() override;
 	virtual FText GetNodeTitle(ENodeTitleType::Type TitleType) const override;
@@ -34,7 +49,8 @@ public:
 
 	UEdGraphPin* FindPin(ESkillPhase Phase);
 	const FName& GetAbilityName() const { return AbilityAtlasName; };
-
+	const FSipherSkillBoostData& GetBoostInfo() { return BoostInfo; }
+	const FSkillBoostInfoEditor& GetBoostEditorInfo() { return EditorInfo; }
 	TSharedPtr<FStructOnScope> Settings;
 protected:
 	UPROPERTY()
@@ -43,5 +59,7 @@ protected:
 	struct FSipherSubSkillInfo Info;
 	UPROPERTY()
 	FSipherSkillBoostData BoostInfo;
+	UPROPERTY()
+	FSkillBoostInfoEditor EditorInfo;
 	TMap<ESkillPhase, UEdGraphPin*> SkillPhaseToPin;
 };
