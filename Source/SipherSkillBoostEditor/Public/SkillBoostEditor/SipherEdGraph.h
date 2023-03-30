@@ -16,4 +16,5 @@ class SIPHERSKILLBOOSTEDITOR_API USipherEdGraph : public UEdGraph
 	GENERATED_BODY()
 public:
 	void SyncData(class USipherSkillData* SkillData, FSipherSkillBoostData* BoostData);
+	FGraphAppearanceInfo GetGraphAppearance() const;
 };

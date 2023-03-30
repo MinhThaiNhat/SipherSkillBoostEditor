@@ -9,18 +9,6 @@
 #include "SipherAbilityEdGraphNode.generated.h"
 
 
-USTRUCT(BlueprintType)
-struct FSkillBoostInfoEditor
-{
-	GENERATED_BODY()
-	UPROPERTY()
-	FName Ability;
-	UPROPERTY()
-	TSubclassOf<class USipherAbilityTargetType> TargetingType;
-	UPROPERTY()
-	TArray<FSipherSkillParamModifierInfo> SkillParamModifierInfo;
-};
-
 /**
  * 
  */
@@ -49,17 +37,18 @@ public:
 
 	UEdGraphPin* FindPin(ESkillPhase Phase);
 	const FName& GetAbilityName() const { return AbilityAtlasName; };
-	const FSipherSkillBoostData& GetBoostInfo() { return BoostInfo; }
-	const FSkillBoostInfoEditor& GetBoostEditorInfo() { return EditorInfo; }
+	FSipherSkillBoostData BuildBoostInfo();
 	TSharedPtr<FStructOnScope> Settings;
-protected:
-	UPROPERTY()
+public:
+	UPROPERTY(EditAnywhere)
 	FName AbilityAtlasName;
-	UPROPERTY()
-	struct FSipherSubSkillInfo Info;
-	UPROPERTY()
-	FSipherSkillBoostData BoostInfo;
-	UPROPERTY()
-	FSkillBoostInfoEditor EditorInfo;
+
+	UPROPERTY(EditAnywhere)
+	TArray<FSipherSkillParamModifierInfo> SkillParamModifierInfo;
+
+	UPROPERTY(EditAnywhere)
+	TSubclassOf<class USipherAbilityTargetType> TargetingType;
+
 	TMap<ESkillPhase, UEdGraphPin*> SkillPhaseToPin;
+	TSubclassOf<USipherSkillAbility> SkillAbilityClass = nullptr;
 };

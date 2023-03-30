@@ -2,4 +2,5 @@
 
 
 #include "SkillBoostEditor/SipherSkillBoostDataEditor.h"
+#include "SkillBoostEditor/FSkillBoostAssetEditorToolkit.h"
 

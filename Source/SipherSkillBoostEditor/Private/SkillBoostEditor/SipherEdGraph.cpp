@@ -94,3 +94,15 @@ void USipherEdGraph::SyncData(USipherSkillData* SkillData, FSipherSkillBoostData
 		AbilityNode.Value->Sync();
 	}
 }
+
+FGraphAppearanceInfo USipherEdGraph::GetGraphAppearance() const
+{
+	// Create the appearance info
+	FGraphAppearanceInfo AppearanceInfo;
+
+	AppearanceInfo.CornerText = FText::FromString(TEXT("CornerText"));
+
+	AppearanceInfo.InstructionText = FText::FromString(GetName());
+
+	return AppearanceInfo;
+}

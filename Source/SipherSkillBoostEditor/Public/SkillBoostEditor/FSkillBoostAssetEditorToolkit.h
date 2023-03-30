@@ -6,6 +6,23 @@
 #include "SkillBoostEditor/SipherSkillBoostDataEditor.h"
 #include "CoreMinimal.h"
 
+class FSkillEditorCommands : public TCommands<FSkillEditorCommands>
+{
+public:
+	/** Constructor */
+	FSkillEditorCommands() 
+		: TCommands<FSkillEditorCommands>("SkillEditorCommands", NSLOCTEXT("Contexts", "SkillEditorCommands", "Skill Editor"), NAME_None, FEditorStyle::GetStyleSetName())
+	{
+	}
+
+	/** Compile the blueprint */
+	TSharedPtr<FUICommandInfo> SaveBoost;
+	TSharedPtr<FUICommandInfo> NewSkillBoost;
+
+	/** Initialize commands */
+	virtual void RegisterCommands() override;
+};
+
 /**
  * 
  */
@@ -34,14 +51,19 @@ public:
 	void OnDoubleClick(TSharedPtr<FName> InItem);
 	void LoadGraphAsset();
 	TSharedRef<SGraphEditor> CreateGraphEditorWidget(UEdGraph* InGraph);
-	TSharedRef<SWidget> CreateOptionalDataOnlyMessage() const;
+	TSharedRef<SWidget> CreateOptionalDataOnlyMessage();
 	void PostRegenerateMenusAndToolbars() override;
 
 private:
+	void CommandNewBoost();
+	void CommandSaveBoost();
 	void OnFinishChangeSkillData(const FPropertyChangedEvent& Event);
+	void OnFinishChangeBoostData(const FPropertyChangedEvent& EventData);
 	void OnClose() override;
 	void SaveEditedObjectState();
 	void RestoreTab();
+	void OnSkillDescriptionCommited(const FText& InFilterText, ETextCommit::Type InCommitType);
+
 	TSharedRef<SDockTab> SpawnDetailTab(const FSpawnTabArgs& SpawnTabArgs);
 	TSharedRef<SDockTab> SpawnSkillBoostDetailTab(const FSpawnTabArgs& SpawnTabArgs);
 	TSharedRef<SDockTab> SpawnSkillBoostTableTab(const FSpawnTabArgs& SpawnTabArgs);
@@ -51,7 +73,7 @@ private:
 	USipherSkillData* Asset;
 	TMap<FName, TSharedPtr<SGraphEditor>> GraphEditors;
 	TSharedPtr<class IDetailsView> AssetPropertyView;
-	TSharedPtr<class IStructureDetailsView> SkillBoostView;
+	TSharedPtr<class IDetailsView> SkillBoostView;
 	/** Temporary data table to use to display import options */
 	UPROPERTY()
 	TObjectPtr<UDataTable> DataTableImportOptions;

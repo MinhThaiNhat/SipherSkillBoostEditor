@@ -8,29 +8,22 @@
 void USipherAbilityEdGraphNode::SetAbility(const FName& InAbilityAtlasName, const FSipherSubSkillInfo& InInfo)
 {
 	AbilityAtlasName = InAbilityAtlasName;
-	Info = InInfo;
+	SkillAbilityClass = InInfo.SkillAbilityClass;
 }
 
 void USipherAbilityEdGraphNode::SetBoost(FSipherSkillBoostData* BoostData)
 {
-	if (BoostData)
+	if (!BoostData)
+		return;
+	if (AbilityAtlasName == "Base")
 	{
-		BoostInfo = *BoostData;
-		if (AbilityAtlasName == "Base")
-		{
-			EditorInfo.Ability = AbilityAtlasName;
-			EditorInfo.SkillParamModifierInfo = BoostData->SkillParamModifierInfo;
-			EditorInfo.TargetingType = BoostData->TargetingType;
-			Settings = MakeShareable(new FStructOnScope(FSkillBoostInfoEditor::StaticStruct(), (uint8*)&EditorInfo));
-		}
-		else if (BoostData->AbilityAndConditionToActivate.Contains(AbilityAtlasName))
-		{
-			EditorInfo.Ability = AbilityAtlasName;
-			EditorInfo.SkillParamModifierInfo = BoostData->AbilityAndConditionToActivate[AbilityAtlasName].SkillParamModifierInfo;
-			EditorInfo.TargetingType = BoostData->AbilityAndConditionToActivate[AbilityAtlasName].TargetingType;
-			Settings = MakeShareable(new FStructOnScope(FSkillBoostInfoEditor::StaticStruct(), (uint8*)&EditorInfo));
-		}
-		Settings = MakeShareable(new FStructOnScope(FSipherSkillBoostData::StaticStruct(), (uint8*)&BoostInfo));
+		TargetingType = BoostData->TargetingType;
+		SkillParamModifierInfo = BoostData->SkillParamModifierInfo;
+	}
+	else if (BoostData->AbilityAndConditionToActivate.Contains(AbilityAtlasName))
+	{
+		TargetingType = BoostData->AbilityAndConditionToActivate[AbilityAtlasName].TargetingType;
+		SkillParamModifierInfo = BoostData->AbilityAndConditionToActivate[AbilityAtlasName].SkillParamModifierInfo;
 	}
 }
 
@@ -45,9 +38,8 @@ void USipherAbilityEdGraphNode::Sync()
 			break;
 		}
 	}
-	bool bHasBoostInfo = BoostInfo.AbilityAndConditionToActivate.Contains(GetAbilityName());
 
-	if (!bHasBoostInfo && !bHasAnyConnection)
+	if (!bHasAnyConnection && SkillParamModifierInfo.IsEmpty())
 		MakeAutomaticallyPlacedGhostNode();
 }
 
@@ -79,16 +71,19 @@ UEdGraphPin* USipherAbilityEdGraphNode::FindPin(ESkillPhase Phase)
 	return nullptr;
 }
 
+FSipherSkillBoostData USipherAbilityEdGraphNode::BuildBoostInfo()
+{
+	return FSipherSkillBoostData();
+}
+
 void USipherAbilityEdGraphNode::AllocateDefaultPins()
 {
-	if (!Info.SkillAbilityClass)
-		return;
 	SkillPhaseToPin.Add(ESkillPhase::ESP_None, CreatePin(EGPD_Input, PinCategory, "ESkillPhase::ESP_None", TEXT("Exec")));
 
 	SkillPhaseToPin.Add(ESkillPhase::ESP_PreActivate, CreatePin(EGPD_Output, PinCategory, "ESkillPhase::ESP_PreActivate", TEXT("Pre Activate")));
 	SkillPhaseToPin.Add(ESkillPhase::ESP_Activate, CreatePin(EGPD_Output, PinCategory, "ESkillPhase::ESP_Activate", TEXT("Activated")));
 	SkillPhaseToPin.Add(ESkillPhase::ESP_End, CreatePin(EGPD_Output, PinCategory, "ESkillPhase::ESP_End", TEXT("End")));
-	if (Info.SkillAbilityClass->GetDefaultObject()->IsA(USipherSummonBaseAbility::StaticClass()))
+	if (SkillAbilityClass && SkillAbilityClass->GetDefaultObject()->IsA(USipherSummonBaseAbility::StaticClass()))
 	{
 		SkillPhaseToPin.Add(ESkillPhase::ESP_Summon, CreatePin(EGPD_Output, PinCategory, "ESkillPhase::ESP_Summon", TEXT("Summoned")));
 		SkillPhaseToPin.Add(ESkillPhase::ESP_SummonFinish, CreatePin(EGPD_Output, PinCategory, "ESkillPhase::ESP_SummonFinish", TEXT("SummonRecall")));
@@ -132,5 +127,5 @@ FLinearColor USipherAbilityEdGraphNode::GetNodeBodyTintColor() const
 
 FText USipherAbilityEdGraphNode::GetTooltipText() const
 {
-	return FText::FromString(BoostInfo.Description);
+	return FText::FromString(AbilityAtlasName.ToString());
 }

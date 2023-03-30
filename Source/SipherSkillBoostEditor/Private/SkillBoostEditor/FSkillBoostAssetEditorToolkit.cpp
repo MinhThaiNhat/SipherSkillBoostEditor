@@ -180,6 +180,35 @@ void FSkillBoostAssetEditorToolkit::InitializeAssetEditor(const EToolkitMode::Ty
 	);
 
 	InitAssetEditor(Mode, InitToolkitHost, FName("SkillBoostAssetEditor"), StandaloneOurAssetEditor, true, true, InAssets);
+	const FSkillEditorCommands& Commands = FSkillEditorCommands::Get();
+
+	ToolkitCommands->MapAction(
+		Commands.SaveBoost,
+		FExecuteAction::CreateSP(this, &FSkillBoostAssetEditorToolkit::CommandSaveBoost));
+
+	ToolkitCommands->MapAction(
+		Commands.NewSkillBoost,
+		FExecuteAction::CreateSP(this, &FSkillBoostAssetEditorToolkit::CommandNewBoost));
+
+	TSharedPtr<FExtender> ToolbarExtender = MakeShareable(new FExtender);
+
+	ToolbarExtender->AddToolBarExtension(
+		"Asset",
+		EExtensionHook::After,
+		GetToolkitCommands(),
+		FToolBarExtensionDelegate::CreateStatic([](FToolBarBuilder& ToolbarBuilder, const TSharedRef<FUICommandList> ToolkitCommandsParam) {
+			ToolbarBuilder.BeginSection("SkillBoost");
+			const FSlateIcon NewNodeIcon = FSlateIcon(TEXT("EditorStyle"), "BlueprintEditor.AddNewEventGraph");
+			const FSlateIcon NewNodeIco2n = FSlateIcon(TEXT("EditorStyle"), "Level.SaveModifiedIcon16x");
+			ToolbarBuilder.AddToolBarButton(FSkillEditorCommands::Get().SaveBoost, NAME_None, {}, {}, NewNodeIco2n);
+			
+			ToolbarBuilder.AddToolBarButton(FSkillEditorCommands::Get().NewSkillBoost, NAME_None, {}, {}, NewNodeIcon);
+			ToolbarBuilder.EndSection();
+			}, GetToolkitCommands())
+	);
+
+	AddToolbarExtender(ToolbarExtender);
+
 	RegenerateMenusAndToolbars();
 	TabManager->TryInvokeTab(FName("AssetPropertyTab"));
 	GEditor->GetEditorSubsystem<UAssetEditorSubsystem>()->NotifyAssetOpened(GraphAsset, this );
@@ -188,28 +217,37 @@ void FSkillBoostAssetEditorToolkit::InitializeAssetEditor(const EToolkitMode::Ty
 
 void FSkillBoostAssetEditorToolkit::OnSelectedNodesChanged(const FName& BoostId, const FGraphPanelSelectionSet& InGrapSelected)
 {
-	TArray<UObject*> Selection;
+	/*TArray<UObject*> Selection;
 
 	for (UObject* SelectionEntry : InGrapSelected)
 	{
 		Selection.Add(SelectionEntry);
 	}
-	if (InGrapSelected.Num() == 1)
+	if (!SkillBoostView)
+		TabManager->TryInvokeTab(FName("SkillBoostInfoTab"));
+	if (!InGrapSelected.IsEmpty())
 	{
 		auto V = Cast<USipherAbilityEdGraphNode>(Selection[0]);
-		if (!SkillBoostView)
-			TabManager->TryInvokeTab(FName("SkillBoostInfoTab"));
 		if (SkillBoostView)
 		{
-			auto Settings = MakeShareable(new FStructOnScope(FSkillBoostInfoEditor::StaticStruct(), (uint8*)&V->GetBoostEditorInfo()));
+			auto Settings = MakeShareable(new FStructOnScope(FSipherSkillBoostData::StaticStruct(), (uint8*)&V->GetBoostInfo()));
 			SkillBoostView->SetStructureData(Settings);
 		}
-		TabManager->TryInvokeTab(FName("SkillBoostInfoTab"));
-	}
+	}*/
 }
 
 void FSkillBoostAssetEditorToolkit::OnNodeDoubleClicked(const FName& BoostId, class UEdGraphNode* InGrapSelected)
 {
+	if (!IsValid(InGrapSelected))
+		return;
+	auto V = Cast<USipherAbilityEdGraphNode>(InGrapSelected);
+	if (!SkillBoostView)
+		TabManager->TryInvokeTab(FName("SkillBoostInfoTab"));
+	if (SkillBoostView)
+	{
+		SkillBoostView->SetObject(InGrapSelected);
+	}
+	TabManager->TryInvokeTab(FName("SkillBoostInfoTab"));
 }
 
 TSharedRef<SDockTab> FSkillBoostAssetEditorToolkit::SpawnDetailTab(const FSpawnTabArgs& SpawnTabArgs)
@@ -250,10 +288,12 @@ TSharedRef<SDockTab> FSkillBoostAssetEditorToolkit::SpawnSkillBoostDetailTab(con
 
 	FStructureDetailsViewArgs StructureViewArgs;
 
-	SkillBoostView = PropertyEditorModule.CreateStructureDetailView(DetailsViewArgs, StructureViewArgs, TSharedPtr<FStructOnScope>());
+	SkillBoostView = PropertyEditorModule.CreateDetailView(DetailsViewArgs);
+	SkillBoostView->OnFinishedChangingProperties().AddRaw(this, &FSkillBoostAssetEditorToolkit::OnFinishChangeBoostData);
+
 	return SNew(SDockTab)
 		[
-			SkillBoostView->GetWidget().ToSharedRef()
+			SkillBoostView.ToSharedRef()
 		];
 }
 
@@ -355,8 +395,17 @@ TSharedRef<SGraphEditor> FSkillBoostAssetEditorToolkit::CreateGraphEditorWidget(
 		{
 			OnNodeDoubleClicked("", InNode);
 		});
+	auto SiperEdGraph = Cast<USipherEdGraph>(InGraph);
+	// Create the appearance info
+	FGraphAppearanceInfo AppearanceInfo;
 
-	auto Editor = SNew(SGraphEditor).GraphToEdit(InGraph).GraphEvents(InEvents).AssetEditorToolkit(this->AsShared());
+	AppearanceInfo.CornerText = FText::FromString(InGraph->GetName());
+
+	auto Editor = SNew(SGraphEditor)
+		.GraphToEdit(InGraph)
+		.GraphEvents(InEvents)
+		.Appearance(AppearanceInfo)
+		.AssetEditorToolkit(this->AsShared());
 
 	FVector2D ViewOffset = FVector2D::ZeroVector;
 	float ZoomAmount = INDEX_NONE;
@@ -411,12 +460,21 @@ void FSkillBoostAssetEditorToolkit::RestoreTab()
 	}
 }
 
+void FSkillBoostAssetEditorToolkit::OnSkillDescriptionCommited(const FText& InFilterText, ETextCommit::Type InCommitType)
+{
+	if (IsValid(Asset))
+		Asset->SkillDecription = InFilterText;
+}
 
-TSharedRef<SWidget> FSkillBoostAssetEditorToolkit::CreateOptionalDataOnlyMessage() const
+
+TSharedRef<SWidget> FSkillBoostAssetEditorToolkit::CreateOptionalDataOnlyMessage()
 {
 	TSharedRef<SWidget> Message = SNullWidget::NullWidget;
 	if (!IsValid(Asset) || Asset->SkillDecription.IsEmpty())
 		return Message;
+
+	auto Font = FEditorStyle::GetFontStyle(TEXT("PropertyWindow.BoldFont"));
+	Font.Size = 20;
 	Message = SNew(SBorder)
 		.Padding(FMargin(5))
 		.BorderImage(FEditorStyle::GetBrush("ToolPanel.GroupBorder"))
@@ -424,10 +482,20 @@ TSharedRef<SWidget> FSkillBoostAssetEditorToolkit::CreateOptionalDataOnlyMessage
 			SNew(SMultiLineEditableText)
 			.Text(Asset->SkillDecription)
 			.AutoWrapText(false)
-		
+			.TextStyle(FEditorStyle::Get(), "RichTextBlock.BoldHighlight")
+			.Font(Font)
+			.OnTextCommitted(FOnTextCommitted::CreateRaw(this, &FSkillBoostAssetEditorToolkit::OnSkillDescriptionCommited))
 		];
 
 	return Message;
+}
+
+void FSkillBoostAssetEditorToolkit::CommandNewBoost()
+{
+}
+
+void FSkillBoostAssetEditorToolkit::CommandSaveBoost()
+{
 }
 
 void FSkillBoostAssetEditorToolkit::OnFinishChangeSkillData(const FPropertyChangedEvent& EventData)
@@ -436,8 +504,26 @@ void FSkillBoostAssetEditorToolkit::OnFinishChangeSkillData(const FPropertyChang
 	//Class->FindPropertyByName()
 }
 
+void FSkillBoostAssetEditorToolkit::OnFinishChangeBoostData(const FPropertyChangedEvent& EventData)
+{
+	UClass* Class = USipherSkillData::StaticClass();
+	//Class->FindPropertyByName()
+	if (EventData.Property != nullptr)
+	{
+		const FName PropertyName(EventData.Property->GetFName());
+
+		if (PropertyName == GET_MEMBER_NAME_CHECKED(USipherAbilityEdGraphNode, AbilityAtlasName))
+		{
+		}
+	}
+}
 
 void FSkillBoostAssetEditorToolkit::PostRegenerateMenusAndToolbars()
 {
-	
+}
+
+void FSkillEditorCommands::RegisterCommands()
+{
+	UI_COMMAND(SaveBoost, "Save Boost", "Save Skill Boost", EUserInterfaceActionType::Button, FInputChord());
+	UI_COMMAND(NewSkillBoost, "New Skill Boost", "Add New Skill Boost", EUserInterfaceActionType::Button, FInputChord());
 }
